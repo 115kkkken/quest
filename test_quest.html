@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>回合任務遊戲（單檔）</title>
+  <style>
+    :root{
+      --bg:#000;
+      --fg:#fff;
+      --muted:#bbb;
+      --accent:#1ea7fd;
+      --success:#2ecc71;
+      --fail:#e74c3c;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      background:var(--bg);
+      color:var(--fg);
+    }
+
+    .center{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:20px;
+      padding:24px;
+      box-sizing:border-box;
+      text-align:center;
+    }
+
+    h1{ margin:0; font-size:20px; letter-spacing:0.6px; font-weight:600; }
+
+    /* 主畫面圓圈列 */
+    .circle-row{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    .circle-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:center;
+    }
+
+    .round-label{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .circle{
+      width:88px;
+      height:88px;
+      border-radius:50%;
+      background:transparent;
+      color:var(--fg);
+      border:2px solid var(--fg);
+      font-size:28px;
+      font-weight:600;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      transition: transform .12s ease, background .12s ease, color .12s ease, opacity .12s ease, box-shadow .12s ease;
+      user-select:none;
+    }
+
+    .circle:focus{
+      outline:3px solid rgba(255,255,255,0.12);
+      transform:translateY(-4px);
+    }
+
+    .circle:hover{
+      transform:translateY(-6px);
+      background:rgba(255,255,255,0.06);
+    }
+
+    /* 已完成結果狀態（成功/失敗） */
+    .circle.result-success{
+      background: var(--success);
+      border-color: var(--success);
+      color: #06270b;
+      box-shadow: 0 6px 18px rgba(46,204,113,0.12);
+      cursor: default;
+      transform: translateY(0) !important;
+      opacity: 1;
+      pointer-events: none;
+    }
+    .circle.result-fail{
+      background: var(--fail);
+      border-color: var(--fail);
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(231,76,60,0.12);
+      cursor: default;
+      transform: translateY(0) !important;
+      opacity: 1;
+      pointer-events: none;
+    }
+
+    /* result / action area */
+    .muted{ color:var(--muted); }
+
+    .action-row{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+      margin-top:8px;
+    }
+
+    .action{
+      padding:10px 18px;
+      border-radius:8px;
+      border:2px solid var(--fg);
+      background:transparent;
+      color:var(--fg);
+      cursor:pointer;
+      font-size:16px;
+      transition:background .12s ease, transform .12s ease;
+    }
+
+    .action:focus{ outline:3px solid rgba(255,255,255,0.08); transform:translateY(-3px); }
+    .action.success{ border-color:var(--success); color:var(--success); }
+    .action.fail{ border-color:var(--fail); color:var(--fail); }
+    .action.reset{ border-color:var(--accent); color:var(--accent); }
+
+    .action:hover{ background:rgba(255,255,255,0.04); transform:translateY(-4px); }
+
+    .outcome{
+      margin-top:18px;
+      padding:18px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:rgba(255,255,255,0.02);
+      min-width:220px;
+    }
+
+    .outcome.hidden{ display:none; }
+
+    .visually-hidden{
+      position:absolute!important;
+      height:1px;width:1px;
+      overflow:hidden;clip:rect(1px,1px,1px,1px);
+      white-space:nowrap;border:0;padding:0;margin:-1px;
+    }
+
+    /* 兩個「畫面」的容器，透過 .hidden 切換顯示 */
+    .screen{ width:100%; max-width:900px; transition: opacity .18s ease, transform .18s ease; }
+    .hidden{ display:none !important; opacity:0; transform:translateY(8px); }
+
+    /* 勝利橫幅（預設隱藏） */
+    .banner{
+      margin-top:6px;
+      padding:14px 20px;
+      border-radius:10px;
+      font-weight:700;
+      letter-spacing:0.6px;
+      display:flex;
+      gap:16px;
+      align-items:center;
+      justify-content:center;
+      min-width:260px;
+    }
+    .banner.good{
+      background: linear-gradient(90deg, rgba(46,204,113,0.12), rgba(46,204,113,0.06));
+      color:var(--success);
+      border:1px solid rgba(46,204,113,0.12);
+    }
+    .banner.bad{
+      background: linear-gradient(90deg, rgba(231,76,60,0.12), rgba(231,76,60,0.06));
+      color:var(--fail);
+      border:1px solid rgba(231,76,60,0.12);
+    }
+
+    /* 當遊戲結束時，隱藏主內容並把 banner 拉成全螢幕置中顯示 */
+    .game-over #mainContent { display: none !important; }
+    .game-over #gameBanner {
+      display:flex !important;
+      position:fixed;
+      inset:0;
+      align-items:center;
+      justify-content:center;
+      z-index:999;
+      background: linear-gradient(180deg, rgba(0,0,0,0.92), rgba(0,0,0,0.96));
+      font-size:28px;
+      flex-direction:column;
+      gap:18px;
+      padding:20px;
+    }
+    .game-over #gameBanner .action { font-size:18px; padding:12px 20px; }
+
+    /* 小螢幕調整 */
+    @media (max-width:480px){
+      .circle{ width:64px; height:64px; font-size:20px; }
+      .center{ gap:16px; padding:12px; }
+      .game-over #gameBanner { font-size:20px; padding:12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="center" id="app">
+    <h1 class="visually-hidden">回合任務遊戲</h1>
+
+    <!-- 主畫面 -->
+    <section id="mainScreen" class="screen" aria-live="polite">
+      <!-- 主要內容（在遊戲結束時會整個隱藏） -->
+      <div id="mainContent">
+        <h1>選擇回合並進行任務</h1>
+        <p class="muted">最左為第 1 回合，依序為第 2、3、4、5 回合。當任務成功或失敗後，該回合會顯示結果顏色。</p>
+
+        <div class="circle-row" role="list" aria-label="數字選單">
+          <!-- 每個 circle 包在 circle-wrap 中並顯示回合標籤 -->
+          <div class="circle-wrap">
+            <button class="circle" role="listitem" data-round="1" data-num="3" aria-label="回合 1：選擇 3">3</button>
+            <div class="round-label">回合 1</div>
+          </div>
+
+          <div class="circle-wrap">
+            <button class="circle" role="listitem" data-round="2" data-num="4" aria-label="回合 2：選擇 4">4</button>
+            <div class="round-label">回合 2</div>
+          </div>
+
+          <div class="circle-wrap">
+            <button class="circle" role="listitem" data-round="3" data-num="5" aria-label="回合 3：選擇 5">5</button>
+            <div class="round-label">回合 3</div>
+          </div>
+
+          <div class="circle-wrap">
+            <button class="circle" role="listitem" data-round="4" data-num="5" aria-label="回合 4：選擇 5 兩個">5</button>
+            <div class="round-label">回合 4</div>
+          </div>
+
+          <div class="circle-wrap">
+            <button class="circle" role="listitem" data-round="5" data-num="6" aria-label="回合 5：選擇 6">6</button>
+            <div class="round-label">回合 5</div>
+          </div>
+        </div>
+
+        <!-- 任務區塊 -->
+        <div style="margin-top:18px;">
+          <p id="selectedInfo" class="muted">尚未選擇回合</p>
+
+          <!-- 預設隱藏，只有在選擇回合後才顯示 -->
+          <div class="action-row hidden" id="actions" aria-label="選擇結果">
+            <button id="successBtn" class="action success">任務成功</button>
+            <button id="failBtn" class="action fail">失敗</button>
+          </div>
+
+          <div id="outcome" class="outcome hidden" role="status" aria-live="polite">
+            <p id="outcomeText"></p>
+            <div style="margin-top:12px; display:flex; gap:10px; justify-content:center;">
+              <button id="backBtn" class="action">取消選擇</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 遊戲勝利顯示（放在 mainScreen 裡，但當 game-over 時會被放成全螢幕） -->
+      <div id="gameBanner" class="banner hidden" role="status" aria-live="assertive">
+        <div id="bannerText"></div>
+        <button id="resetBtn" class="action reset">重新開始</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const app = document.getElementById('app');
+      const mainContent = document.getElementById('mainContent');
+      const circles = Array.from(document.querySelectorAll('.circle'));
+      const selectedInfo = document.getElementById('selectedInfo');
+      const successBtn = document.getElementById('successBtn');
+      const failBtn = document.getElementById('failBtn');
+      const actions = document.getElementById('actions');
+      const outcome = document.getElementById('outcome');
+      const outcomeText = document.getElementById('outcomeText');
+      const backBtn = document.getElementById('backBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const gameBanner = document.getElementById('gameBanner');
+      const bannerText = document.getElementById('bannerText');
+
+      // 狀態陣列：index 0..4 對應回合 1..5
+      const states = Array(5).fill('pending'); // 'pending' | 'success' | 'fail'
+      let currentIndex = null; // 被選的回合 index (0-4)
+      let gameOver = false;
+
+      function updateSelectedInfo() {
+        if (currentIndex === null) {
+          selectedInfo.textContent = '尚未選擇回合';
+        } else {
+          const round = currentIndex + 1;
+          const num = circles[currentIndex].dataset.num;
+          selectedInfo.textContent = `第 ${round} 回合（數字 ${num}）`;
+        }
+      }
+
+      function showOutcome(text) {
+        outcomeText.textContent = text;
+        outcome.classList.remove('hidden');
+      }
+
+      function hideOutcome() {
+        outcome.classList.add('hidden');
+      }
+
+      function setCircleResult(idx, ok) {
+        const btn = circles[idx];
+        btn.classList.remove('result-success', 'result-fail');
+        if (ok) {
+          btn.classList.add('result-success');
+          btn.setAttribute('aria-label', `回合 ${idx+1}：${btn.dataset.num}（任務成功）`);
+          states[idx] = 'success';
+        } else {
+          btn.classList.add('result-fail');
+          btn.setAttribute('aria-label', `回合 ${idx+1}：${btn.dataset.num}（任務失敗）`);
+          states[idx] = 'fail';
+        }
+        btn.disabled = true;
+      }
+
+      function countResults() {
+        const succ = states.filter(s => s === 'success').length;
+        const fail = states.filter(s => s === 'fail').length;
+        return {succ, fail};
+      }
+
+      function endGame(goodWins) {
+        gameOver = true;
+        // disable all remaining buttons
+        circles.forEach(b => b.disabled = true);
+        actions.querySelectorAll('button').forEach(b => b.disabled = true);
+
+        // show banner with message and make it fullscreen (CSS .game-over handles hiding other things)
+        bannerText.textContent = goodWins ? '好人獲勝 🎉' : '任務失敗三次😈請大家討論投票誰是壞人 ';
+        gameBanner.classList.remove('hidden');
+        gameBanner.classList.remove('good','bad');
+        if (goodWins) gameBanner.classList.add('good');
+        else gameBanner.classList.add('bad');
+
+        // hide main content and show banner fullscreen
+        app.classList.add('game-over');
+
+        // focus reset button for accessibility
+        setTimeout(() => resetBtn.focus(), 80);
+      }
+
+      function checkWin() {
+        const {succ, fail} = countResults();
+        if (succ >= 3) { endGame(true); return true; }
+        if (fail >= 3) { endGame(false); return true; }
+        return false;
+      }
+
+      function resetGame() {
+        // reset states
+        for (let i=0;i<states.length;i++) states[i] = 'pending';
+        circles.forEach((btn, i) => {
+          btn.classList.remove('result-success','result-fail');
+          btn.disabled = false;
+          btn.setAttribute('aria-label', `回合 ${i+1}：選擇 ${btn.dataset.num}`);
+        });
+        currentIndex = null;
+        gameOver = false;
+        hideOutcome();
+        updateSelectedInfo();
+        // hide actions until a circle is clicked again
+        actions.classList.add('hidden');
+        // hide banner and remove game-over mode
+        gameBanner.classList.add('hidden');
+        gameBanner.classList.remove('good','bad');
+        app.classList.remove('game-over');
+        // enable action buttons
+        actions.querySelectorAll('button').forEach(b => b.disabled = false);
+        // focus first button
+        if (circles[0]) circles[0].focus();
+      }
+
+      // binding circle buttons
+      circles.forEach((btn, i) => {
+        btn.addEventListener('click', () => {
+          if (gameOver) return;
+          if (btn.disabled) return;
+          currentIndex = i;
+          updateSelectedInfo();
+          hideOutcome();
+          // show action buttons (only after a circle is selected)
+          actions.classList.remove('hidden');
+          // focus success button
+          successBtn.focus();
+        });
+        btn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+        });
+      });
+
+      // action buttons
+      successBtn.addEventListener('click', () => {
+        if (currentIndex === null || gameOver) return;
+        setCircleResult(currentIndex, true);
+        showOutcome('任務成功');
+        currentIndex = null;
+        updateSelectedInfo();
+        if (!checkWin()) {
+          // 隱藏 actions，必須重新選擇回合才能再顯示
+          actions.classList.add('hidden');
+          // focus next available unfinished button if any
+          const next = circles.find(c => !c.disabled);
+          if (next) next.focus();
+        }
+      });
+
+      failBtn.addEventListener('click', () => {
+        if (currentIndex === null || gameOver) return;
+        setCircleResult(currentIndex, false);
+        showOutcome('任務失敗');
+        currentIndex = null;
+        updateSelectedInfo();
+        if (!checkWin()) {
+          actions.classList.add('hidden');
+          const next = circles.find(c => !c.disabled);
+          if (next) next.focus();
+        }
+      });
+
+      // back button just clears selection
+      backBtn.addEventListener('click', () => {
+        currentIndex = null;
+        updateSelectedInfo();
+        hideOutcome();
+        actions.classList.add('hidden');
+        const first = circles.find(c => !c.disabled) || circles[0];
+        if (first) first.focus();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        resetGame();
+      });
+
+      // keyboard support for action buttons
+      [successBtn, failBtn, backBtn, resetBtn].forEach(b => {
+        b.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); }
+        });
+      });
+
+      // quick select by number key 1..5 (回合) 或 3/4/5/6 (數字)
+      document.addEventListener('keydown', (e) => {
+        const tag = document.activeElement && document.activeElement.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+
+        if (gameOver) {
+          // allow R to reset
+          if (e.key.toLowerCase() === 'r') { e.preventDefault(); resetGame(); }
+          return;
+        }
+
+        // 如果按 1..5，選回合
+        if (['1','2','3','4','5'].includes(e.key)) {
+          const round = Number(e.key);
+          const btn = circles[round-1];
+          if (btn && !btn.disabled) {
+            e.preventDefault();
+            btn.click();
+          }
+        }
+        // 如果按數字 3/4/5/6，選第一個對應數字未完成的回合
+        if (['3','4','5','6'].includes(e.key)) {
+          const numKey = e.key;
+          const btn = circles.find(c => c.dataset.num === numKey && !c.disabled);
+          if (btn) {
+            e.preventDefault();
+            btn.click();
+          }
+        }
+        // Esc 清除選取
+        if (e.key === 'Escape') {
+          if (currentIndex !== null) {
+            currentIndex = null;
+            updateSelectedInfo();
+            hideOutcome();
+            actions.classList.add('hidden');
+            const first = circles.find(c => !c.disabled) || circles[0];
+            if (first) first.focus();
+          }
+        }
+      });
+
+      // initial focus & info
+      window.addEventListener('load', () => {
+        updateSelectedInfo();
+        if (circles[0]) circles[0].focus();
+      });
+
+    })();
+  </script>
+</body>
+</html>
