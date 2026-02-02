@@ -38,11 +38,11 @@
 
     h1{ margin:0; font-size:20px; letter-spacing:0.6px; font-weight:600; }
 
-    /* 主畫面圓圈列 */
+    /* 主畫面圓圈列 - 垂直置中以確保所有圓圈高度一致 */
     .circle-row{
       display:flex;
       gap:18px;
-      align-items:center;
+      align-items:center; /* 改為 center，讓所有圓圈基線相同 */
       justify-content:center;
       flex-wrap:wrap;
     }
@@ -52,6 +52,41 @@
       flex-direction:column;
       gap:8px;
       align-items:center;
+      position:relative;
+      /* 統一 wrap 的最小高度，確保高度一致 */
+      min-height: 110px;
+      box-sizing: border-box;
+    }
+
+    /* pair 包含第三和第四回合，protect label 置中在兩者上方（使用絕對定位，不影響其他 wrap 的位置） */
+    .pair-wrap{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      position:relative;
+    }
+    .pair-circles{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .protect-label{
+      font-size:13px;
+      color:var(--accent);
+      font-weight:700;
+      letter-spacing:0.2px;
+      background:rgba(30,167,253,0.06);
+      padding:6px 10px;
+      border-radius:8px;
+      border:1px solid rgba(30,167,253,0.08);
+      position:absolute;
+      top: -22px; /* 置於兩個圓圈上方，不會影響其他元素高度 */
+      left: 50%;
+      transform: translateX(-50%);
+      white-space:nowrap;
     }
 
     .round-label{
@@ -74,6 +109,7 @@
       justify-content:center;
       transition: transform .12s ease, background .12s ease, color .12s ease, opacity .12s ease, box-shadow .12s ease;
       user-select:none;
+      box-sizing: border-box;
     }
 
     .circle:focus{
@@ -205,6 +241,8 @@
       .circle{ width:64px; height:64px; font-size:20px; }
       .center{ gap:16px; padding:12px; }
       .game-over #gameBanner { font-size:20px; padding:12px; }
+      .protect-label{ font-size:11px; padding:4px 8px; top:-18px; }
+      .circle-wrap { min-height: 92px; }
     }
   </style>
 </head>
@@ -217,10 +255,10 @@
       <!-- 主要內容（在遊戲結束時會整個隱藏） -->
       <div id="mainContent">
         <h1>選擇回合並進行任務</h1>
-        <p class="muted">綠色代表任務成功 紅色任務失敗</p>
+        <p class="muted">最左為第 1 回合，依序為第 2、3、4、5 回合。當任務成功或失敗後，該回合會顯示結果顏色。</p>
 
         <div class="circle-row" role="list" aria-label="數字選單">
-          <!-- 每個 circle 包在 circle-wrap 中並顯示回合標籤 -->
+          <!-- 第一與第二回合保留原結構 -->
           <div class="circle-wrap">
             <button class="circle" role="listitem" data-round="1" data-num="3" aria-label="回合 1：選擇 3">3</button>
             <div class="round-label">回合 1</div>
@@ -231,16 +269,24 @@
             <div class="round-label">回合 2</div>
           </div>
 
-          <div class="circle-wrap">
-            <button class="circle" role="listitem" data-round="3" data-num="5" aria-label="回合 3：選擇 5">5</button>
-            <div class="round-label">回合 3</div>
+          <!-- pair-wrap 包含第三與第四回合，protect label 置中在兩者上方 -->
+          <div class="pair-wrap" aria-hidden="false">
+            <div class="protect-label" aria-hidden="true">使用魔法護身符</div>
+
+            <div class="pair-circles">
+              <div class="circle-wrap">
+                <button class="circle" role="listitem" data-round="3" data-num="5" aria-label="回合 3：選擇 5">5</button>
+                <div class="round-label">回合 3</div>
+              </div>
+
+              <div class="circle-wrap">
+                <button class="circle" role="listitem" data-round="4" data-num="5" aria-label="回合 4：選擇 5 兩個">5</button>
+                <div class="round-label">回合 4</div>
+              </div>
+            </div>
           </div>
 
-          <div class="circle-wrap">
-            <button class="circle" role="listitem" data-round="4" data-num="5" aria-label="回合 4：選擇 5 兩個">5</button>
-            <div class="round-label">回合 4</div>
-          </div>
-
+          <!-- 第五回合 -->
           <div class="circle-wrap">
             <button class="circle" role="listitem" data-round="5" data-num="6" aria-label="回合 5：選擇 6">6</button>
             <div class="round-label">回合 5</div>
@@ -277,7 +323,6 @@
   <script>
     (function(){
       const app = document.getElementById('app');
-      const mainContent = document.getElementById('mainContent');
       const circles = Array.from(document.querySelectorAll('.circle'));
       const selectedInfo = document.getElementById('selectedInfo');
       const successBtn = document.getElementById('successBtn');
@@ -342,7 +387,7 @@
         actions.querySelectorAll('button').forEach(b => b.disabled = true);
 
         // show banner with message and make it fullscreen (CSS .game-over handles hiding other things)
-        bannerText.textContent = goodWins ? '好人獲勝 🎉' : '任務失敗三次😈請大家投票誰是壞人 ';
+        bannerText.textContent = goodWins ? '好人獲勝 🎉' : '壞人獲勝 😈';
         gameBanner.classList.remove('hidden');
         gameBanner.classList.remove('good','bad');
         if (goodWins) gameBanner.classList.add('good');
