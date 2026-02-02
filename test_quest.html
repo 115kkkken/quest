@@ -217,7 +217,7 @@
       <!-- 主要內容（在遊戲結束時會整個隱藏） -->
       <div id="mainContent">
         <h1>選擇回合並進行任務</h1>
-        <p class="muted">最左為第 1 回合，依序為第 2、3、4、5 回合。當任務成功或失敗後，該回合會顯示結果顏色。</p>
+        <p class="muted">綠色代表任務成功 紅色任務失敗</p>
 
         <div class="circle-row" role="list" aria-label="數字選單">
           <!-- 每個 circle 包在 circle-wrap 中並顯示回合標籤 -->
@@ -342,7 +342,7 @@
         actions.querySelectorAll('button').forEach(b => b.disabled = true);
 
         // show banner with message and make it fullscreen (CSS .game-over handles hiding other things)
-        bannerText.textContent = goodWins ? '好人獲勝 🎉' : '任務失敗三次😈請大家討論投票誰是壞人 ';
+        bannerText.textContent = goodWins ? '好人獲勝 🎉' : '任務失敗三次😈請大家投票誰是壞人 ';
         gameBanner.classList.remove('hidden');
         gameBanner.classList.remove('good','bad');
         if (goodWins) gameBanner.classList.add('good');
